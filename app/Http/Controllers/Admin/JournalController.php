@@ -1,0 +1,305 @@
+<?php
+
+namespace App\Http\Controllers\Admin;
+
+use Carbon\Carbon;
+use Illuminate\Support\Arr;
+use Illuminate\Http\Request;
+
+use Illuminate\Support\Facades\Log;
+use App\Http\Controllers\Controller;
+use Illuminate\Support\Facades\Validator;
+use App\Models\{Currency, JournalCategory, Journal, Coa, JournalEntry};
+
+class JournalController extends Controller
+{
+    /**
+     * Display a listing of the resource.
+     */
+
+    public function index(Request $request)
+    {
+        // Ambil nilai filter dari request
+        $startDate = $request->input('start_date');
+        $endDate = $request->input('end_date');
+        $categoryId = $request->input('category_id', 1);
+        $categoryJournals = $categoryId ? JournalCategory::find($categoryId) : null;
+
+        // Query jurnal dengan filter periode dan kategori
+        $journals = Journal::with([
+            'journalCategory',      // Ambil kategori jurnal
+            'journalEntries.coa',   // Ambil detail akun (COA) dari setiap journal entry
+            'currency',
+        ])
+            ->where('category_id', $categoryId) // Filter hanya kategori tertentu
+            ->when($startDate, function ($query) use ($startDate) {
+                return $query->whereDate('date', '>=', $startDate);
+            })
+            ->when($endDate, function ($query) use ($endDate) {
+                return $query->whereDate('date', '<=', $endDate);
+            })
+            ->orderBy('id', 'asc')
+            // ->get();
+            ->paginate(10);
+        // Ambil hanya 10 data pertama dari hasil query
+        // $journals = $journals->take(10);
+        return view('pages.journals.index', compact('journals', 'startDate', 'endDate', 'categoryId', 'categoryJournals'));
+    }
+
+    /**
+     * Show the form for creating a new resource.
+     */
+    public function create(Request $request, $category)
+    {
+        $currencies = Currency::all();
+        $categories = JournalCategory::all();
+
+        $coas = Coa::whereDoesntHave('children')->get();
+
+        // $coas = Coa::all();
+
+        // $coas = Coa::whereNotIn('code', function ($query) {
+        //     $query->select('parent_code')->from('coas')->whereNotNull('parent_code');
+        // })->get();
+
+        // Ambil bulan & tahun saat ini
+        $bulan = Carbon::now()->format('m');
+        $tahun = Carbon::now()->format('Y');
+
+        // Ambil transaksi terakhir untuk bulan ini
+        $lastTransaction = Journal::whereYear('created_at', $tahun)
+            ->whereMonth('created_at', $bulan)
+            ->latest('reference')
+            ->first();
+
+        // Tentukan nomor urut berikutnya
+        $nextNumber = optional($lastTransaction)->reference
+            ? ((int)substr($lastTransaction->reference, -4) + 1)
+            : 1;
+
+        $noUrut = str_pad($nextNumber, 4, '0', STR_PAD_LEFT);
+
+        // Buat nomor referensi
+        $referenceNo = "TRX-{$bulan}{$tahun}-{$noUrut}";
+
+        // Ambil kategori jurnal
+        $categoryJournals = JournalCategory::find($category);
+        if (!$categoryJournals) {
+            return redirect()->route('journals.index')->with('error', 'Kategori tidak ditemukan.');
+        }
+
+        return view('pages.journals.create', compact('currencies', 'categories', 'coas', 'categoryJournals', 'referenceNo'));
+    }
+
+    /**
+     * Store a newly created resource in storage.
+     */
+    public function store(Request $request)
+    {
+        // dd($request->all());
+        // Bersihkan pemisah ribuan dari input debit dan credit
+        $cleanedEntries = collect($request->journal_entries)->map(function ($entry) {
+            $entry['debit'] = str_replace('.', '', $entry['debit'] ?? '0');
+            $entry['credit'] = str_replace('.', '', $entry['credit'] ?? '0');
+            return $entry;
+        })->toArray();
+
+        // Merge kembali ke request
+        $request->merge(['journal_entries' => $cleanedEntries]);
+        // Validasi input
+        $validated = $request->validate([
+            'date' => 'required|date',
+            'description' => 'required|string|max:255',
+            'category_id' => 'required|exists:journal_categories,id',
+            'currency_id' => 'required|exists:currencies,id',
+            'reference' => 'required|string|unique:journals,reference', // Pastikan unik
+            'journal_entries' => 'required|array|min:2', // Minimal harus ada 2 entry (debit & kredit)
+            'journal_entries.*.coa_id' => 'required|exists:coas,id',
+            'journal_entries.*.debit' => 'nullable|numeric|min:0',
+            'journal_entries.*.credit' => 'nullable|numeric|min:0',
+        ], [
+            'date.required' => 'Tanggal harus di isi.',
+            'date.date' => 'Format tanggal tidak valid.',
+            'description.required' => 'Deskripsi harus diisi.',
+            'category_id.required' => 'Kategori harus dipilih.',
+            'category_id.exists' => 'Kategori tidak valid.',
+            'currency_id.required' => 'Mata uang harus dipilih.',
+            'currency_id.exists' => 'Mata uang tidak valid.',
+            'reference.required' => 'Nomor referensi harus diisi.',
+            'reference.unique' => 'Nomor referensi sudah digunakan.',
+            'journal_entries.required' => 'Minimal harus ada dua entri (debit & kredit).',
+            'journal_entries.min' => 'Minimal harus ada dua entri (debit & kredit).',
+            'journal_entries.*.coa_id.required' => 'COA harus dipilih.',
+            'journal_entries.*.coa_id.exists' => 'COA tidak valid.',
+            'journal_entries.*.debit.numeric' => 'Nilai debit harus berupa angka.',
+            'journal_entries.*.credit.numeric' => 'Nilai kredit harus berupa angka.',
+        ]);
+
+        // try {
+        // Simpan ke tabel Journal
+        $journal = Journal::create([
+            'date' => $validated['date'],
+            'reference' => $validated['reference'],
+            'description' => $validated['description'],
+            'category_id' => $validated['category_id'],
+            'currency_id' => $validated['currency_id'],
+            // 'created_by' => auth()->id(),
+        ]);
+
+        // Simpan ke tabel JournalEntry
+        foreach ($validated['journal_entries'] as $entry) {
+            JournalEntry::create([
+                'journal_id' => $journal->id,
+                'coa_id' => $entry['coa_id'],
+                'debit' => $entry['debit'] ?? 0,
+                'credit' => $entry['credit'] ?? 0,
+            ]);
+        }
+
+        // return redirect()->back()->withErrors($validated)->withInput();
+
+        return redirect()->route('journals.index', [
+            'category_id' => $request->input('category_id'),
+            'start_date' => $request->input('start_date'),
+            'end_date' => $request->input('end_date'),
+        ])->with('success', 'Jurnal berhasil diperbarui.');
+
+        // } catch (\Exception $e) {
+        //     return redirect()->back()
+        //         ->withErrors(['error' => 'Terjadi kesalahan saat menyimpan data.'])
+        //         ->withInput();
+        // }
+    }
+
+    /**
+     * Show the form for editing the specified resource.
+     */
+    public function edit($id)
+    {
+        // Ambil data jurnal berdasarkan ID beserta relasi kategori & entries
+        $journal = Journal::with(['journalCategory', 'journalEntries.coa'])->findOrFail($id);
+
+        // Ambil semua data mata uang (currencies)
+        $currencies = Currency::all();
+
+        // Ambil semua kategori jurnal
+        $categories = JournalCategory::all();
+
+        // Ambil semua daftar akun COA
+        $coas = Coa::all();
+
+        return view('pages.journals.edit', compact('journal', 'currencies', 'categories', 'coas'));
+    }
+    /**
+     * Update the specified resource in storage.
+     */
+    public function update(Request $request, string $id)
+    {
+        // Bersihkan nilai debit dan kredit
+        $cleanedEntries = collect($request->input('journal_entries', []))->map(function ($entry) {
+            $entry['debit'] = str_replace('.', '', $entry['debit'] ?? '0');
+            $entry['credit'] = str_replace('.', '', $entry['credit'] ?? '0');
+            return $entry;
+        })->toArray();
+
+        // Validasi input
+        // $validated = $request->validate([
+        //     'date' => 'required|date',
+        //     'description' => 'required|string|max:255',
+        //     'category_id' => 'required|exists:journal_categories,id',
+        //     'currency_id' => 'required|exists:currencies,id',
+        //     'journal_entries' => 'required|array|min:2',
+        //     'journal_entries.*.coa_id' => 'required|exists:coas,id',
+        //     'journal_entries.*.debit' => 'nullable|numeric|min:0',
+        //     'journal_entries.*.credit' => 'nullable|numeric|min:0',
+        // ]);
+
+        $request->merge(['journal_entries' => $cleanedEntries]);
+        // Validasi input
+        $validated = $request->validate([
+            'date' => 'required|date',
+            'description' => 'required|string|max:255',
+            'category_id' => 'required|exists:journal_categories,id',
+            'currency_id' => 'required|exists:currencies,id',
+            'journal_entries' => 'required|array|min:2', // Minimal harus ada 2 entry (debit & kredit)
+            'journal_entries.*.coa_id' => 'required|exists:coas,id',
+            'journal_entries.*.debit' => 'nullable|numeric|min:0',
+            'journal_entries.*.credit' => 'nullable|numeric|min:0',
+        ], [
+            'date.required' => 'Tanggal harus di isi.',
+            'date.date' => 'Format tanggal tidak valid.',
+            'description.required' => 'Deskripsi harus diisi.',
+            'category_id.required' => 'Kategori harus dipilih.',
+            'category_id.exists' => 'Kategori tidak valid.',
+            'currency_id.required' => 'Mata uang harus dipilih.',
+            'currency_id.exists' => 'Mata uang tidak valid.',
+            'journal_entries.required' => 'Minimal harus ada dua entri (debit & kredit).',
+            'journal_entries.min' => 'Minimal harus ada dua entri (debit & kredit).',
+            'journal_entries.*.coa_id.required' => 'COA harus dipilih.',
+            'journal_entries.*.coa_id.exists' => 'COA tidak valid.',
+            'journal_entries.*.debit.numeric' => 'Nilai debit harus berupa angka.',
+            'journal_entries.*.credit.numeric' => 'Nilai kredit harus berupa angka.',
+        ]);
+
+        // Cari jurnal berdasarkan ID
+        $journal = Journal::findOrFail($id);
+
+        // Menghitung total debit dan kredit
+        $totalDebit = collect($cleanedEntries)->sum('debit');
+        $totalCredit = collect($cleanedEntries)->sum('credit');
+
+        // Jika jumlah debit dan kredit tidak sama, kembalikan error
+        if ($totalDebit != $totalCredit) {
+            return redirect()->back()
+                ->withErrors(['error' => 'Jumlah debit dan kredit harus sama.'])
+                ->withInput();
+        }
+
+        // Update jurnal (tanpa journal_entries)
+        $journal->update(Arr::except($validated, ['journal_entries']));
+
+        // Simpan ID coa_id yang baru untuk perbandingan
+        $newEntryIds = [];
+
+        // Update atau buat journal_entries
+        foreach ($validated['journal_entries'] as $entry) {
+            if (!empty($entry['coa_id'])) {
+                $newEntryIds[] = $entry['coa_id'];
+                JournalEntry::updateOrCreate(
+                    ['journal_id' => $journal->id, 'coa_id' => $entry['coa_id']],
+                    ['debit' => $entry['debit'], 'credit' => $entry['credit']]
+                );
+            }
+        }
+
+        // Hapus entri lama yang tidak ada dalam input terbaru
+        JournalEntry::where('journal_id', $journal->id)->whereNotIn('coa_id', $newEntryIds)->delete();
+        // Log::info('Setting success message in session.');
+        // Redirect kembali ke index dengan nilai filter
+        return redirect()->route('journals.index', [
+            'category_id' => $request->input('category_id'),
+            'start_date' => $request->input('start_date'),
+            'end_date' => $request->input('end_date'),
+        ])->with('success', 'Jurnal berhasil diperbarui.');
+    }
+    /**
+     * Display the specified resource.
+     */
+    public function show(string $id)
+    {
+        //
+    }
+
+    /**
+     * Remove the specified resource from storage.
+     */
+    public function destroy($id)
+    {
+        $journal = Journal::findOrFail($id);
+        $categoryId = $journal->category_id;
+        $journal->delete();
+
+        return redirect()->route('journals.index', ['category_id' => $categoryId])
+            ->with('success', 'Jurnal berhasil dihapus.');
+    }
+}
