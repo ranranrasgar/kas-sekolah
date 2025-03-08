@@ -24,9 +24,9 @@ class DatabaseSeeder extends Seeder
             AgamaSeeder::class, // Seeder agama
         ]);
 
-        $classes = \App\Models\Classe::factory(6)->create()->pluck('id')->toArray(); // Buat 6 kelas tetap
+        $classes = \App\Models\Classe::factory(7)->create()->pluck('id')->toArray(); // Buat 6 kelas tetap
 
-        $majors = \App\Models\Major::factory(3)->create()->pluck('id')->toArray();  // Buat 3 jurusan
+        $majors = \App\Models\Major::factory(4)->create()->pluck('id')->toArray();  // Buat 3 jurusan
 
         $total_students_per_major = 100; // 100 siswa per jurusan
         // input siswa 3 kelas, setiap kelas ada 3 jurusan
@@ -167,9 +167,22 @@ class DatabaseSeeder extends Seeder
         ];
 
         // Simpan ID dari setiap CoaType yang dibuat
+        $availableCoas = Coa::whereNotNull('parent_id') // Bukan COA utama (bukan root)
+            ->whereDoesntHave('children') // Tidak memiliki anak (leaf node)
+            ->whereNotIn('id', JournalCategory::pluck('coa_id')) // Hindari duplikasi
+            ->pluck('id')
+            ->toArray();
         foreach ($journalCatData as $type) {
-            $coaType = JournalCategory::firstOrCreate(
-                ['name' => $type['name']]
+            if (!empty($availableCoas)) {
+                $coaId = array_shift($availableCoas); // Ambil COA pertama yang tersedia
+            } else {
+                // Jika tidak ada COA yang tersedia, pakai COA default (misalnya COA leaf pertama yang ditemukan)
+                $coaId = Coa::whereNotNull('parent_id')->whereDoesntHave('children')->value('id');
+            }
+
+            JournalCategory::firstOrCreate(
+                ['name' => $type['name']],
+                ['coa_id' => $coaId]
             );
         }
 

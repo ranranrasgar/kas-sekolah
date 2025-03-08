@@ -2,8 +2,9 @@
 
 namespace Database\Factories;
 
-use Illuminate\Database\Eloquent\Factories\Factory;
+use App\Models\Coa;
 use App\Models\JournalCategory;
+use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
  * @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Models\JournalCategoy>
@@ -37,6 +38,7 @@ class JournalCategoyFactory extends Factory
                 'Bantuan dari Organisasi atau LSM',
                 'Beasiswa dari Yayasan atau Perusahaan'
             ]),
+            'coa_id' => Coa::inRandomOrder()->first()->id ?? Coa::factory(),
             'created_at' => now(),
         ];
     }

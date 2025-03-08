@@ -15,7 +15,7 @@ class ClasseFactory extends Factory
     public function definition(): array
     {
         static $index = 0; // Untuk memastikan data yang di-generate urut
-        $classes = ['Kelas 7', 'Kelas 8', 'Kelas 9', 'Kelas 10', 'Kelas 11', 'Kelas 12'];
+        $classes = ['Siswa Baru', 'Kelas 7', 'Kelas 8', 'Kelas 9', 'Kelas 10', 'Kelas 11', 'Kelas 12'];
 
         // Pastikan tidak lebih dari jumlah kelas yang diinginkan
         if ($index >= count($classes)) {

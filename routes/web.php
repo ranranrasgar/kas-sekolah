@@ -7,8 +7,9 @@ use Illuminate\Support\Facades\Session;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\Admin\CoaController;
 use App\Http\Controllers\Admin\JournalController;
-use App\Http\Controllers\Auth\VerifyEmailController;
 use App\Http\Controllers\Admin\StudentController;
+use App\Http\Controllers\Admin\BankbookController;
+use App\Http\Controllers\Auth\VerifyEmailController;
 
 // Route::post('/set-active-menu', [MenuController::class, 'setActiveMenu'])->name('set.active.menu');
 
@@ -36,45 +37,32 @@ Route::post('/update-active-menu', function (Request $request) {
 
 Route::middleware('auth', 'verified')->group(function () {
 
+    // Siswa
+    Route::resource('students', StudentController::class);
+    // Profile
+    Route::prefix('profile')->name('profile.')->controller(ProfileController::class)->group(function () {
+        Route::get('/', 'edit')->name('edit');
+        Route::patch('/', 'update')->name('update');
+        Route::delete('/', 'destroy')->name('destroy');
+        Route::post('/photo', 'updateProfilePhoto')->name('update_photo');
+    });
+    // Coa
+    Route::resource('coa', CoaController::class);
     Route::get('/coa/codes/{coa_type_id}', function ($coa_type_id) {
         // Ambil semua kode COA berdasarkan tipe yang dipilih
         $codes = Coa::where('coa_type_id', $coa_type_id)->pluck('code')->toArray();
-
         return response()->json($codes);
     });
+    // Get Prefixses
+    Route::get('/api/coa-prefixes', [CoaController::class, 'getPrefixes']);
+    // Journal Umum
+    Route::resource('journals', JournalController::class);
+    // bankbook
+    Route::resource('bankbook', BankbookController::class);
 
-    Route::get('/students', [StudentController::class, 'index'])->name('students.index');
-    Route::get('/students/create', [StudentController::class, 'create'])->name('students.create');
-    Route::post('/students', [StudentController::class, 'store'])->name('students.store');
-    Route::delete('/students/{id}', [StudentController::class, 'destroy'])->name('students.destroy');
-    Route::get('/students/{id}/edit', [StudentController::class, 'edit'])->name('students.edit');
-    Route::put('/students/{id}', [StudentController::class, 'update'])->name('students.update');
-
-    Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
-    Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
-    Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
-    Route::post('/profile/photo', [ProfileController::class, 'updateProfilePhoto'])->name('profile.update_photo');
-
-    Route::get('/coa', [CoaController::class, 'index'])->name('coa.index');
-    Route::get('/coa/create', [CoaController::class, 'create'])->name('coa.create');
-    Route::post('/coa', [CoaController::class, 'store'])->name('coa.store');
-    Route::delete('/coa/{id}', [CoaController::class, 'destroy'])->name('coa.destroy');
-    Route::get('/coa/{id}/edit', [CoaController::class, 'edit'])->name('coa.edit');
-    Route::put('/coa/{id}', [CoaController::class, 'update'])->name('coa.update');
-
-
-    // Route::get('/journals/cat=1', [JournalController::class, 'index'])->name('journals.index');
-    Route::get('/journals', [JournalController::class, 'index'])->name('journals.index');
-    Route::get('/journals/{id}/edit', [JournalController::class, 'edit'])->name('journals.edit');
-    Route::put('/journals/{id}', [JournalController::class, 'update'])->name('journals.update');
-    Route::get('/journals/create/{category}', [JournalController::class, 'create'])->name('journals.create');
-    Route::post('/journals', [JournalController::class, 'store'])->name('journals.store');
-    Route::delete('/journals/{id}', [JournalController::class, 'destroy'])->name('journals.destroy');
-
-    Route::get('/akademik', [JournalController::class, 'index'])->name('akademik.index');
-    Route::get('/keuangan', [JournalController::class, 'index'])->name('keuangan.index');
-    Route::get('/keuangan/dana-bos/data', [JournalController::class, 'dataDanaBos'])->name('keuangan.dana-bos.data');
-    Route::get('/keuangan/dana-bos/penerimaan', [JournalController::class, 'penerimaanDanaBos'])->name('keuangan.dana-bos.penerimaan');
+    Route::prefix('bankbook')->name('bankbook.')->controller(BankbookController::class)->group(function () {
+        Route::get('/create/{category?}', 'create')->name('create');
+    });
 
     Route::get('email/verify', [VerifyEmailController::class, 'show'])->name('verification.notice');
     Route::get('email/verify/{id}/{hash}', [VerifyEmailController::class, 'verify'])

@@ -20,7 +20,7 @@ class MajorFactory extends Factory
     public function definition(): array
     {
         static $index = 0; // Gunakan static agar tidak mengulang data
-        $majors = ['ATPH', 'Multimedia', 'DPIB'];
+        $majors = ['Siswa Baru', 'ATPH', 'Multimedia', 'DPIB'];
 
         return [
             'major_name' => $majors[$index++], // Ambil satu per satu sesuai urutan

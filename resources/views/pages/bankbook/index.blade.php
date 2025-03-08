@@ -3,6 +3,7 @@
     <div class="row">
         <div class="col-md-12">
             <div class="card">
+                {{-- Tambah Data Journal --}}
                 <div class="card-header">
                     <div class="row align-items-center">
                         <!-- Judul -->
@@ -11,130 +12,120 @@
                                 {{ session('activeSubSubmenu') }}
                             </h4>
                         </div>
+                        <!-- Filter & Tombol -->
                         <div class="col-12 col-md d-flex flex-wrap flex-md-nowrap justify-content-md-end gap-2">
-                            <a href="{{ route('students.create') }}" class="btn btn-sm btn-primary">
-                                <i class="fa fa-plus"></i> Siswa Baru
-                            </a>
-                            <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#filterModal">
-                                <i class="fa fa-filter"></i> Filter
-                            </button>
-                        </div>
-                    </div>
-                </div>
-                {{-- Modal Filter Data --}}
-                <!-- Modal Filter -->
-                <div class="modal fade" id="filterModal" tabindex="-1" aria-labelledby="filterModalLabel"
-                    aria-hidden="true">
-                    <div class="modal-dialog">
-                        <div class="modal-content">
-                            <div class="modal-header">
-                                <h5 class="modal-title" id="filterModalLabel">Filter Siswa</h5>
-                                <button type="button" class="btn-close" data-bs-dismiss="modal"
-                                    aria-label="Close"></button>
-                            </div>
-
-                            <form action="{{ route('students.index') }}" method="GET">
-                                <div class="modal-body">
-                                    <div class="mb-3">
-                                        <label for="class" class="form-label">Kelas</label>
-                                        <select class="form-select" name="class_id">
-                                            <option value="">-- Pilih Kelas --</option>
-                                            @foreach ($classes as $class)
-                                                <option value="{{ $class->id }}">{{ $class->class_name }}</option>
-                                            @endforeach
-                                        </select>
-                                    </div>
-                                    <div class="mb-3">
-                                        <label for="major" class="form-label">Jurusan</label>
-                                        <select class="form-select" name="major_id">
-                                            <option value="">-- Pilih Jurusan --</option>
-                                            @foreach ($majors as $major)
-                                                <option value="{{ $major->id }}">{{ $major->major_name }}</option>
-                                            @endforeach
-                                        </select>
-                                    </div>
-                                    <div class="mb-3">
-                                        <label for="gender" class="form-label">Jenis Kelamin</label>
-                                        <select class="form-select" name="gender">
-                                            <option value="">-- Pilih Jenis Kelamin --</option>
-                                            <option value="L">Laki-laki</option>
-                                            <option value="P">Perempuan</option>
-                                        </select>
-                                    </div>
+                            <!-- Form Filter -->
+                            <form method="GET" action="{{ route('bankbook.index') }}" class="d-flex flex-wrap gap-2">
+                                {{-- <input type="hidden" name="category_id" value="{{ request('category_id') }}"> --}}
+                                <!-- Menyimpan category_id -->
+                                <div>
+                                    <label for="category_id" class="form-label m-0"><small>Bank Book</small></label>
+                                    <select name="category_id" id="category_id" class="form-control form-control-sm">
+                                        <option value="">-- Pilih Jenis Bankbook --</option>
+                                        @foreach ($categories as $type)
+                                            <option value="{{ $type->id }}"
+                                                {{ request('category_id') == $type->id ? 'selected' : '' }}>
+                                                {{ $type->name }}
+                                            </option>
+                                        @endforeach
+                                    </select>
                                 </div>
-                                <div class="modal-footer">
-                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Tutup</button>
-                                    <button type="submit" class="btn btn-primary">Terapkan Filter</button>
+                                <div>
+                                    <label for="start_date" class="form-label m-0"><small>Tanggal Mulai</small></label>
+                                    <input type="date" name="start_date" id="start_date"
+                                        class="form-control form-control-sm" value="{{ request('start_date') }}">
+
+
+                                </div>
+                                <div>
+                                    <label for="end_date" class="form-label m-0"><small>Tanggal Akhir</small></label>
+                                    <input type="date" name="end_date" id="end_date"
+                                        class="form-control form-control-sm" value="{{ request('end_date') }}">
+
+                                </div>
+                                <div class="d-flex align-items-end gap-2">
+                                    <button type="submit" class="btn btn-sm btn-primary">Filter</button>
+                                    <a href="{{ route('bankbook.index') }}" class="btn btn-sm btn-secondary">Reset</a>
                                 </div>
                             </form>
+                            <!-- Tombol Tambah Transaksi harus sejajar -->
+                            <a href="{{ route('bankbook.create', ['category' => request('category_id', 1)]) }}"
+                                class="btn btn-sm btn-primary align-self-end">
+                                <i class="fa fa-plus"></i> Transaksi
+                            </a>
                         </div>
+
                     </div>
                 </div>
-
-
                 <div class="card-body">
+                    {{-- <x-validations-errors /> --}}
+                    {{-- <script>
+                        var showNotification = @json(session('show_notification', true));
+                        var notificationTitle = @json(session('notification_title', 'Selamat Datang di Aplikasi SIMDIK Al-Hawari'));
+                        var notificationMessage = @json(session('notification_message', 'Hi! Selamat bekerja..'));
+                    </script> --}}
                     @if (session('success'))
-                        <div class="alert alert-success">{{ session('success') }}</div>
+                        <x-notification :show="true" title="Info Database" message="Data berhasil di simpan!" />
                     @endif
+
                     <div class="table-responsive">
                         <table id="add-row" class="display table table-striped table-hover">
                             <thead>
                                 <tr>
                                     <th>No</th>
-                                    <th>NISN</th>
-                                    <th>Nama</th>
-                                    <th>L/P</th>
-                                    <th>Major</th>
-                                    <th>Class</th>
-                                    <th>Agama</th>
+                                    <th>Tanggal</th>
+                                    <th>No.Reff</th>
+                                    <th>Keterangan</th>
+                                    <th>Debit (Rp)</th>
+                                    <th>Kredit (Rp)</th>
+                                    <th>Saldo (Rp)</th>
                                     <th style="width: 10%">Action</th>
                                 </tr>
                             </thead>
                             <tfoot>
                                 <tr>
                                     <th>No</th>
-                                    <th>NISN</th>
-                                    <th>Nama</th>
-                                    <th>L/P</th>
-                                    <th>Major</th>
-                                    <th>Class</th>
-                                    <th>Agama</th>
-                                    <th>Aksi</th>
+                                    <th>Tanggal</th>
+                                    <th>No.Reff</th>
+                                    <th>Keterangan</th>
+                                    <th>Debit (Rp)</th>
+                                    <th>Kredit (Rp)</th>
+                                    <th>Saldo (Rp)</th>
+
+                                    <th>Action</th>
                                 </tr>
                             </tfoot>
                             <tbody>
-                                @foreach ($students as $student)
+                                @php $no = 1; @endphp
+                                @foreach ($journals as $journal)
                                     <tr>
-                                        <td class="d-flex justify-content-between align-items-center">
-                                            <span>{{ $loop->iteration }}</span>
-                                            <img src="{{ $student->student_photo ? asset('storage/' . $student->student_photo) : asset('storage/students/no_image.jpg') }}"
-                                                alt="Photo" class="rounded-circle zoom-img shadow-lg img-hover"
-                                                width="40" height="40">
+                                        <td>{{ $no++ }}</td>
+                                        <td>{{ \Carbon\Carbon::parse($journal->date)->format('d/m/Y') }}</td>
+                                        <td>{{ $journal->reference }}</td>
+                                        <td>{{ $journal->description }}</td>
+
+                                        <td class="text-end">{{ number_format($journal->debit, 2, ',', '.') }}</td>
+                                        <td class="text-end">{{ number_format($journal->credit, 2, ',', '.') }}</td>
+                                        <td class="text-end">{{ number_format($journal->saldo_rekening, 2, ',', '.') }}
                                         </td>
-                                        <td>{{ $student->nisn }}</td>
-                                        <td>{{ $student->name }}</td>
+
                                         <td>
-                                            @if ($student->gender === 'L')
-                                                <i class="fa fa-user text-primary" title="Laki-laki"></i>
-                                            @else
-                                                <i class="fa fa-user text-danger" title="Perempuan"></i>
-                                            @endif
-                                        </td>
-                                        <td>{{ $student->major->major_name ?? '??' }}</td>
-                                        <td>{{ $student->class->class_name }}</td>
-                                        <td>{{ $student->agama->name }}</td>
-                                        <td>
+                                            <!-- Tombol Edit dan Hapus dalam satu baris -->
                                             <div class="d-flex">
-                                                <a href="{{ route('students.edit', $student->id) }}"
+                                                <!-- Tombol Edit -->
+                                                <a href="{{ route('bankbook.edit', $journal->id) }}"
                                                     class="btn btn-link btn-primary btn-sm me-2" title="Edit">
                                                     <i class="fa fa-edit"></i>
                                                 </a>
-                                                <form id="deleteForm-{{ $student->id }}"
-                                                    action="{{ route('students.destroy', $student->id) }}" method="POST">
+
+                                                <!-- Tombol Hapus -->
+
+                                                <form id="deleteForm-{{ $journal->id }}"
+                                                    action="{{ route('bankbook.destroy', $journal->id) }}" method="POST">
                                                     @csrf
                                                     @method('DELETE')
                                                     <button type="button" class="btn btn-link btn-danger btn-sm delete-btn"
-                                                        data-id="{{ $student->id }}" title="Hapus">
+                                                        data-id="{{ $journal->id }}" title="Hapus">
                                                         <i class="fa fa-trash"></i>
                                                     </button>
                                                 </form>
@@ -149,20 +140,6 @@
             </div>
         </div>
     </div>
-    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-    <script>
-        $(document).ready(function() {
-            $(".zoom-img").hover(
-                function() {
-                    $(this).css("transform", "scale(1.5)").css("transition", "0.3s ease-in-out");
-                },
-                function() {
-                    $(this).css("transform", "scale(1)");
-                }
-            );
-        });
-    </script>
-
     <!--   Core JS Files   -->
     <script src="{{ asset('assets/js/core/jquery-3.7.1.min.js') }}"></script>
 
@@ -172,6 +149,7 @@
     <script src="{{ asset('assets/js/kaiadmin.min.js') }}"></script>
     <!-- Kaiadmin DEMO methods, don't include it in your project! -->
     <script src="{{ asset('assets/js/setting-demo2.js') }}"></script>
+
     {{-- Alart Delete --}}
     <script>
         $(document).on("click", ".delete-btn", function(e) {

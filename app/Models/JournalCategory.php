@@ -15,4 +15,9 @@ class JournalCategory extends Model
     {
         return $this->hasMany(Journal::class, 'category_id');
     }
+
+    public function coa()
+    {
+        return $this->belongsTo(coa::class, 'coa_id');
+    }
 }

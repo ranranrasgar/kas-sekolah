@@ -15,23 +15,44 @@ class CoaController extends Controller
      */
     public function index(Request $request)
     {
-        $coaTypes = Coa::whereNull('parent_id')->get();
-
-        $coas = Coa::with('coaType')
-            // ->when($request->filled('coa_type'), fn($q) => $q->where('coa_type_id', $request->coa_type))
-            ->where('parent_id', $request->coa_type)
+        // $coaTypes = Coa::whereNull('parent_id')->get();
+        $coaTypes = CoaType::all();
+        $coas = Coa::query()
+            ->with('coaType')
+            ->when(
+                $request->filled('coa_type'),
+                fn($q) => $q->where('coa_type_id', intval($request->coa_type))
+            )
             ->orderBy('code', 'asc')
             ->get();
-
+        // $coas = Coa::whereColumn('id', 'parent_id') // Ambil hanya root node
+        //     ->with('children')
+        //     ->get();
+        // Bangun struktur tree
+        // $coaTree = $this->buildTree($coas);
         return view('pages.coa.index', compact('coas', 'coaTypes'));
     }
+
+
+
+    // private function buildTree($coas, $parentId = null, $level = 0)
+    // {
+    //     $tree = [];
+    //     foreach ($coas as $coa) {
+    //         if ($coa->parent_id == $parentId) {
+    //             $coa->level = $level; // Tambahkan level untuk indentasi di Blade
+    //             $coa->children = $this->buildTree($coas, $coa->id, $level + 1); // Rekursi
+    //             $tree[] = $coa;
+    //         }
+    //     }
+    //     return $tree;
+    // }
 
     // Ambil prefix type coa
     public function getPrefixes(): JsonResponse
     {
         // Ambil daftar prefix berdasarkan coa_type_id
         $prefixes = CoaType::pluck('prefix', 'id');
-
         return response()->json($prefixes);
     }
 
@@ -41,9 +62,11 @@ class CoaController extends Controller
     public function create(Request $request)
     {
         $coaTypes = CoaType::all();
+
         // Ambil default coa_type dari request (misal dari filter sebelumnya)
         $defaultCoaType = $request->query('coa_type', null);
-        return view('pages.coa.create', compact('coaTypes', 'defaultCoaType'));
+        $coas = Coa::all();
+        return view('pages.coa.create', compact('coaTypes', 'defaultCoaType', 'coas'));
     }
 
     /**
@@ -54,20 +77,23 @@ class CoaController extends Controller
         // Validasi input
         $request->validate([
             'coa_type_id' => 'required|exists:coa_types,id',
+            'parent_id' => 'nullable|exists:coas,id', // Pastikan parent_id valid jika diisi
             'code' => 'required|unique:coas,code|max:10',
             'name' => 'required|string|max:255',
         ]);
 
-        // Simpan data ke dalam database
-        $coa = new Coa();
-        $coa->coa_type_id = $request->coa_type_id;
-        $coa->code = $request->code;
-        $coa->name = $request->name;
-        $coa->save();
+        // Simpan data ke dalam database dengan cara lebih efisien
+        Coa::create([
+            'coa_type_id' => $request->coa_type_id,
+            'parent_id' => $request->parent_id ?? null, // Pastikan jika kosong tetap null
+            'code' => $request->code,
+            'name' => $request->name,
+        ]);
 
         // Redirect dengan pesan sukses
         return redirect()->route('coa.index')->with('success', 'COA berhasil ditambahkan.');
     }
+
 
     /**
      * Display the specified resource.
@@ -86,14 +112,16 @@ class CoaController extends Controller
      */
     public function edit(string $id)
     {
-        // Ambil data COA berdasarkan ID
         $coa = Coa::findOrFail($id);
 
-        // Ambil semua tipe COA untuk dropdown
+        // aktiva, pasiva dan teman temanya
         $coaTypes = CoaType::all();
 
+        // Ambil semua COA sebagai parent
+        $coas = Coa::all();
+
         // Kirim data COA dan tipe COA ke view untuk ditampilkan pada form edit
-        return view('pages.coa.edit', compact('coa', 'coaTypes'));
+        return view('pages.coa.edit', compact('coa', 'coaTypes', 'coas'));
     }
 
     /**
@@ -104,22 +132,26 @@ class CoaController extends Controller
         // Validasi input
         $request->validate([
             'coa_type_id' => 'required|exists:coa_types,id',
-            'code' => 'required|unique:coas,code,' . $id . '|max:10', // Perhatikan pengecualian pada kode COA yang sudah ada
+            'parent_id' => 'nullable|exists:coas,id', // Tambahkan validasi parent_id
+            'code' => 'required|unique:coas,code,' . $id . '|max:10',
             'name' => 'required|string|max:255',
         ]);
 
         // Ambil data COA berdasarkan ID
         $coa = Coa::findOrFail($id);
 
-        // Update data COA
-        $coa->coa_type_id = $request->coa_type_id;
-        $coa->code = $request->code;
-        $coa->name = $request->name;
-        $coa->save();
+        $coa->update([
+            'coa_type_id' => $request->coa_type_id,
+            'parent_id' => $request->parent_id ?? null, // Pastikan jika kosong tetap null
+            'code' => $request->code,
+            'name' => $request->name,
+        ]);
+
 
         // Redirect dengan pesan sukses
         return redirect()->route('coa.index')->with('success', 'COA berhasil diperbarui.');
     }
+
 
     /**
      * Remove the specified resource from storage.

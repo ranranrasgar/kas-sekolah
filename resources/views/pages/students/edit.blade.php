@@ -24,10 +24,15 @@
                                 <input type="text" name="name" class="form-control"
                                     value="{{ old('name', $student->name) }}" required>
                             </div>
+
                             <div class="col-md-4">
-                                <label for="email" class="form-label">Email</label>
-                                <input type="email" name="email" class="form-control"
-                                    value="{{ old('email', $student->email) }}">
+                                <label for="gender" class="form-label">Jenis Kelamin</label>
+                                <select name="gender" class="form-select">
+                                    <option value="L" {{ old('gender', $student->gender) == 'L' ? 'selected' : '' }}>
+                                        Laki-laki</option>
+                                    <option value="P" {{ old('gender', $student->gender) == 'P' ? 'selected' : '' }}>
+                                        Perempuan</option>
+                                </select>
                             </div>
                         </div>
 
@@ -47,21 +52,10 @@
                                 <input type="date" name="birth_date" class="form-control"
                                     value="{{ old('birth_date', $student->birth_date) }}">
                             </div>
+
                         </div>
 
                         <div class="row mb-3">
-                            <div class="col-md-4">
-                                <label for="major_id" class="form-label">Jurusan</label>
-                                <select name="major_id" class="form-select">
-                                    <option value="">Pilih Jurusan</option>
-                                    @foreach ($majors as $major)
-                                        <option value="{{ $major->id }}"
-                                            {{ old('major_id', $student->major_id) == $major->id ? 'selected' : '' }}>
-                                            {{ $major->major_name }}
-                                        </option>
-                                    @endforeach
-                                </select>
-                            </div>
                             <div class="col-md-4">
                                 <label for="class_id" class="form-label">Kelas</label>
                                 <select name="class_id" class="form-select">
@@ -74,6 +68,19 @@
                                     @endforeach
                                 </select>
                             </div>
+                            <div class="col-md-4">
+                                <label for="major_id" class="form-label">Jurusan</label>
+                                <select name="major_id" class="form-select">
+                                    <option value="">Pilih Jurusan</option>
+                                    @foreach ($majors as $major)
+                                        <option value="{{ $major->id }}"
+                                            {{ old('major_id', $student->major_id) == $major->id ? 'selected' : '' }}>
+                                            {{ $major->major_name }}
+                                        </option>
+                                    @endforeach
+                                </select>
+                            </div>
+
                             <div class="col-md-4">
                                 <label for="agama_id" class="form-label">Agama</label>
                                 <select name="agama_id" class="form-select">

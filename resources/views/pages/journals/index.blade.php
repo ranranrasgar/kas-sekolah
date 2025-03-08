@@ -10,7 +10,6 @@
                         <div class="col-12 col-md-auto mb-2 mb-md-0">
                             <h4 class="card-title m-0">
                                 {{ session('activeSubSubmenu') }}
-
                                 {{-- @if ($categoryId)
                                     {{ optional($categoryJournals)->name }}
                                 @endif --}}
@@ -23,7 +22,7 @@
                         <div class="col-12 col-md d-flex flex-wrap flex-md-nowrap justify-content-md-end gap-2">
                             <!-- Form Filter -->
                             <form method="GET" action="{{ route('journals.index') }}" class="d-flex flex-wrap gap-2">
-                                <input type="hidden" name="category_id" value="{{ request('category_id') }}">
+                                {{-- <input type="hidden" name="category_id" value="{{ request('category_id') }}"> --}}
                                 <!-- Menyimpan category_id -->
 
                                 <div>
@@ -45,8 +44,7 @@
                                 </div>
                             </form>
                             <!-- Tombol Tambah Transaksi harus sejajar -->
-                            <a href="{{ route('journals.create', ['category' => $categoryId]) }}"
-                                class="btn btn-sm btn-primary align-self-end">
+                            <a href="{{ route('journals.create') }}" class="btn btn-sm btn-primary align-self-end">
                                 <i class="fa fa-plus"></i> Transaksi
                             </a>
                         </div>
@@ -63,7 +61,6 @@
                     @if (session('success'))
                         <x-notification :show="true" title="Info Database" message="Data berhasil di simpan!" />
                     @endif
-
 
                     <div class="table-responsive">
                         <table id="add-row" class="display table table-striped table-hover">

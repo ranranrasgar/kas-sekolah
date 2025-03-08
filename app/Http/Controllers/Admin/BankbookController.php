@@ -5,11 +5,11 @@ namespace App\Http\Controllers\Admin;
 use Carbon\Carbon;
 use Illuminate\Support\Arr;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use App\Http\Controllers\Controller;
-use Illuminate\Support\Facades\Validator;
 use App\Models\{Currency, JournalCategory, Journal, Coa, JournalEntry};
 
-class JournalController extends Controller
+class BankbookController extends Controller
 {
     /**
      * Display a listing of the resource.
@@ -19,34 +19,64 @@ class JournalController extends Controller
     {
         $startDate = $request->input('start_date');
         $endDate = $request->input('end_date');
-        // $categoryId = $request->input('category_id', 1);
-        // $categoryJournals = $categoryId ? JournalCategory::find($categoryId) : null;
+        $categoryId = $request->input('category_id', 1); // Default category_id = 11
 
-        // Query jurnal dengan filter periode dan kategori
-        $journals = Journal::with([
-            'journalEntries.coa',
-            'currency',
-        ])
-            ->when($startDate, fn($query) => $query->whereDate('date', '>=', $startDate))
-            ->when($endDate, fn($query) => $query->whereDate('date', '<=', $endDate))
-            ->orderBy('date')
-            ->orderBy('reference')
-            ->orderByDesc(
-                JournalEntry::select('debit')
-                    ->whereColumn('journal_entries.journal_id', 'journals.id')
-                    ->orderByDesc('debit')
-                    ->limit(1)
-            )
-            ->get();
-        // Ambil hanya 10 data pertama dari hasil query
-        // $journals = $journals->take(10);
-        return view('pages.journals.index', compact('journals', 'startDate', 'endDate'));
+        // Ambil daftar kategori jurnal untuk dropdown filter
+        $categories = JournalCategory::with('coa')->get();
+
+        // Query jurnal dengan saldo sebelumnya & saldo rekening
+        $sql = "
+             WITH Saldo AS (
+                 SELECT
+                     j.id,
+                     j.reference,
+                     j.date,
+                     j.description,
+                     c.code,
+                     c.name,
+                     je.debit,
+                     je.credit,
+                     je.created_at,
+                     je.updated_at,
+                     -- Saldo Sebelumnya (Total transaksi sebelum tanggal ini)
+                     (
+                         SELECT SUM(je2.debit - je2.credit)
+                         FROM journal_entries je2
+                         JOIN journals j2 ON je2.journal_id = j2.id
+                         WHERE je2.coa_id = jc.coa_id
+                         AND j2.date < j.date
+                     ) AS saldo_sebelumnya,
+                     -- Saldo Rekening sampai dengan tanggal ini
+                     (
+                         SELECT SUM(je3.debit - je3.credit)
+                         FROM journal_entries je3
+                         JOIN journals j3 ON je3.journal_id = j3.id
+                         WHERE je3.coa_id = jc.coa_id
+                         AND j3.date <= j.date
+                     ) AS saldo_rekening
+                 FROM journals j
+                 INNER JOIN journal_entries je ON je.journal_id = j.id
+                 INNER JOIN journal_categories jc ON jc.coa_id = je.coa_id
+                 INNER JOIN coas c ON je.coa_id = c.id
+                 WHERE jc.id = ?
+                 AND (j.date >= ? OR ? IS NULL) -- Filter Start Date
+                 AND (j.date <= ? OR ? IS NULL) -- Filter End Date
+             )
+             SELECT * FROM Saldo
+             ORDER BY date, reference;
+         ";
+
+        // Masukkan parameter dengan benar
+        $journals = DB::select($sql, [$categoryId, $startDate, $startDate, $endDate, $endDate]);
+
+        return view('pages.bankbook.index', compact('journals', 'startDate', 'endDate', 'categoryId', 'categories'));
     }
+
 
     /**
      * Show the form for creating a new resource.
      */
-    public function create(Request $request)
+    public function create(Request $request, $category)
     {
         $currencies = Currency::all();
         $categories = JournalCategory::all();
@@ -73,6 +103,7 @@ class JournalController extends Controller
         $nextNumber = optional($lastTransaction)->reference
             ? ((int)substr($lastTransaction->reference, -4) + 1)
             : 1;
+
         $noUrut = str_pad($nextNumber, 4, '0', STR_PAD_LEFT);
 
         // Buat nomor referensi
@@ -80,11 +111,12 @@ class JournalController extends Controller
 
         // Ambil kategori jurnal
         // $categoryJournals = JournalCategory::find($category);
-        // if (!$categoryJournals) {
-        //     return redirect()->route('journals.index')->with('error', 'Kategori tidak ditemukan.');
-        // }
+        $categoryJournals = JournalCategory::where('id', $category)->first();
+        if (!$categoryJournals) {
+            return redirect()->route('bankbook.index')->with('error', 'Kategori tidak ditemukan.');
+        }
 
-        return view('pages.journals.create', compact('currencies', 'categories', 'coas', 'referenceNo'));
+        return view('pages.bankbook.create', compact('currencies', 'categories', 'coas', 'categoryJournals', 'referenceNo'));
     }
 
     /**
@@ -154,7 +186,7 @@ class JournalController extends Controller
 
         // return redirect()->back()->withErrors($validated)->withInput();
 
-        return redirect()->route('journals.index', [
+        return redirect()->route('bankbook.index', [
             'category_id' => $request->input('category_id'),
             'start_date' => $request->input('start_date'),
             'end_date' => $request->input('end_date'),
@@ -173,7 +205,7 @@ class JournalController extends Controller
     public function edit($id)
     {
         // Ambil data jurnal berdasarkan ID beserta relasi kategori & entries
-        $journal = Journal::with(['journalCategory', 'journalEntries.coa'])->findOrFail($id);
+        $journal = Journal::with(['journalCategory', 'journalEntries.coa', 'journalCategory.coa'])->findOrFail($id);
 
         // Ambil semua data mata uang (currencies)
         $currencies = Currency::all();
@@ -184,7 +216,7 @@ class JournalController extends Controller
         // Ambil semua daftar akun COA
         $coas = Coa::all();
 
-        return view('pages.journals.edit', compact('journal', 'currencies', 'categories', 'coas'));
+        return view('pages.bankbook.edit', compact('journal', 'currencies', 'categories', 'coas'));
     }
     /**
      * Update the specified resource in storage.
@@ -259,7 +291,8 @@ class JournalController extends Controller
         JournalEntry::where('journal_id', $journal->id)->whereNotIn('coa_id', $newEntryIds)->delete();
         // Log::info('Setting success message in session.');
         // Redirect kembali ke index dengan nilai filter
-        return redirect()->route('journals.index', [
+        // dd($request->all());
+        return redirect()->route('bankbook.index', [
             'category_id' => $request->input('category_id'),
             'start_date' => $request->input('start_date'),
             'end_date' => $request->input('end_date'),
@@ -282,7 +315,7 @@ class JournalController extends Controller
         $categoryId = $journal->category_id;
         $journal->delete();
 
-        return redirect()->route('journals.index', ['category_id' => $categoryId])
+        return redirect()->route('bankbook.index', ['category_id' => $categoryId])
             ->with('success', 'Jurnal berhasil dihapus.');
     }
 }

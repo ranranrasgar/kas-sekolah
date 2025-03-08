@@ -9,7 +9,7 @@
                         <!-- Judul -->
                         <div class="col-12 col-md-auto mb-2 mb-md-0">
                             <h4 class="card-title m-0">
-                                {{ session('activeSubSubmenu') }}
+                                {{ session('activeSubSubmenu') }} - {{ request('categoryJournals') }}
                             </h4>
                         </div>
                         <!-- Filter & Tombol -->
@@ -34,7 +34,6 @@
                                 </div>
                             </form>
 
-
                             <!-- Tombol Tambah Transaksi harus sejajar -->
                             <a href="{{ route('coa.create', ['coa_type' => request('coa_type')]) }}"
                                 class="btn btn-sm btn-primary align-self-end">
@@ -45,7 +44,10 @@
                     </div>
                 </div>
                 <div class="card-body">
-                    <x-validations-errors />
+                    {{-- <x-validations-errors /> --}}
+                    @if (session('success'))
+                        <x-notification :show="true" title="Informasi" message="Data berhasil di simpan!" />
+                    @endif
                     <div class="table-responsive">
                         <table id="add-row" class="display table table-striped table-hover">
                             <thead>
@@ -71,26 +73,33 @@
                                 </tr>
                             </tfoot>
                             <tbody>
-
+                                {{-- @foreach ($coas as $coa)
+                                    @include('pages.coa.tree', ['coa' => $coa, 'level' => 0])
+                                @endforeach --}}
                                 @foreach ($coas as $coa)
-                                    <tr class="{{ is_null($coa->parent_id) ? 'text-danger fw-bold' : '' }}">
-                                        <td style="{{ is_null($coa->parent_id) ? 'color: red; font-weight: bold;' : '' }}">
-                                            {{ $loop->iteration }}</td>
-                                        <td style="{{ is_null($coa->parent_id) ? 'color: red; font-weight: bold;' : '' }}">
-                                            {{ $coa->code }}</td>
-                                        <td style="{{ is_null($coa->parent_id) ? 'color: red; font-weight: bold;' : '' }}">
-                                            @if (!is_null($coa->parent_id))
-                                                <i class="fas fa-sign-out-alt text-primary me-1"></i>
-                                                <span style="margin-left: 15px;">{{ $coa->name }}</span>
+                                    <tr class="{{ $coa->id == $coa->parent_id ? 'text-danger fw-bold' : '' }}">
+
+                                        <td>{{ $loop->iteration }}</td>
+
+                                        <td>
+                                            @if (is_null($coa->parent_id) )
+                                                <!-- Tambahkan ikon berbeda jika id == parent_id -->
+                                                <i class="fas fa-archive text-danger me-1"></i>
+                                                <span style="margin-left: 15px;">
+                                                    {{ $coa->name }}
+                                                </span>
+                                            @elseif (!is_null($coa->parent_id))
+                                                <i class="fas fa-caret-right text-primary me-1"></i>
+                                                <span style="margin-left: 15px;">
+                                                    {{ $coa->name }}
+                                                </span>
                                             @else
                                                 {{ $coa->name }}
                                             @endif
                                         </td>
-                                        <td style="{{ is_null($coa->parent_id) ? 'color: red; font-weight: bold;' : '' }}">
-                                            {{ $coa->coaType->name ?? 'N/A' }}</td>
-                                        <td style="{{ is_null($coa->parent_id) ? 'color: red; font-weight: bold;' : '' }}">
-                                            {{ $coa->coaType->description ?? '-' }}</td>
-
+                                        <td>{{ $coa->code }}</td>
+                                        <td>{{ $coa->coaType->name ?? 'N/A' }}</td>
+                                        <td>{{ $coa->coaType->description ?? '-' }}</td>
                                         <td>
                                             <!-- Tombol Edit dan Hapus dalam satu baris -->
                                             <div class="d-flex">

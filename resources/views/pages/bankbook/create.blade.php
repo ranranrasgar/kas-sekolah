@@ -4,13 +4,13 @@
         <div class="col-md-12">
             <div class="card">
                 <div class="card-header">
-                    <h4 class="fw-bold mb-3">Tambah Jurnal</h4>
+                    <h4 class="fw-bold mb-3">Tambah Jurnal - {{ optional($categoryJournals)->name }}</h4>
                 </div>
                 <div class="card-body">
 
                     <x-validations-errors />
 
-                    <form action="{{ route('journals.store') }}" method="POST">
+                    <form action="{{ route('bankbook.store') }}" method="POST">
                         @csrf
                         <div class="row mb-3">
                             <div class="col-md-4">
@@ -25,12 +25,12 @@
                                     <option value="">Pilih Kategori</option>
                                     @foreach ($categories as $category)
                                         <option value="{{ $category->id }}"
-                                            {{ old('category_id', request('category_id', optional($category)->id)) == $category->id ? 'selected' : '' }}>
-                                            {{ $category->name }}
+                                            {{ old('category_id', request('category_id', optional($categoryJournals)->id)) == $category->id ? 'selected' : '' }}>
+                                            {{ $category->name }} - ({{ $category->coa->code }} :
+                                            {{ $category->coa->name }})
                                         </option>
                                     @endforeach
                                 </select>
-
                             </div>
                             <div class="col-md-4">
                                 <label class="form-label">No Referensi</label>

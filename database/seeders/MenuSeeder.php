@@ -19,11 +19,11 @@ class MenuSeeder extends Seeder
         $pengguna = Menu::create(['name' => 'Manajemen Pengguna', 'route' => '#', 'category_id' => '0', 'icon' => 'fas fa-user-cog']);
 
         // === Submenu Keuangan ===
-        $danaBos = Menu::create(['parent_id' => $keuangan->id, 'name' => 'Keuangan Sekolah', 'route' => 'journals.index', 'category_id' => '1', 'icon' => 'fas fa-university']);
-        Menu::create(['parent_id' => $danaBos->id, 'name' => 'Data Keuangan', 'route' => 'journals.index', 'category_id' => '1', 'icon' => 'fas fa-file-invoice-dollar']);
-        Menu::create(['parent_id' => $danaBos->id, 'name' => 'Penerimaan Dana', 'route' => 'journals.index', 'category_id' => '1', 'icon' => 'fas fa-wallet']);
-        Menu::create(['parent_id' => $danaBos->id, 'name' => 'Pengeluaran Dana', 'route' => 'journals.index', 'category_id' => '1', 'icon' => 'fas fa-money-check-alt']);
-        Menu::create(['parent_id' => $danaBos->id, 'name' => 'Rekapitulasi Keuangan', 'route' => 'journals.index', 'category_id' => '1', 'icon' => 'fas fa-chart-line']);
+        $danaBos = Menu::create(['parent_id' => $keuangan->id, 'name' => 'Keuangan Sekolah', 'route' => 'bankbook.index', 'category_id' => '1', 'icon' => 'fas fa-university']);
+        Menu::create(['parent_id' => $danaBos->id, 'name' => 'Data Keuangan', 'route' => 'bankbook.index', 'category_id' => '1', 'icon' => 'fas fa-file-invoice-dollar']);
+        Menu::create(['parent_id' => $danaBos->id, 'name' => 'Penerimaan Dana', 'route' => 'bankbook.index', 'category_id' => '1', 'icon' => 'fas fa-wallet']);
+        Menu::create(['parent_id' => $danaBos->id, 'name' => 'Pengeluaran Dana', 'route' => 'bankbook.index', 'category_id' => '1', 'icon' => 'fas fa-money-check-alt']);
+        Menu::create(['parent_id' => $danaBos->id, 'name' => 'Rekapitulasi Keuangan', 'route' => 'bankbook.index', 'category_id' => '1', 'icon' => 'fas fa-chart-line']);
 
         $spp = Menu::create(['parent_id' => $keuangan->id, 'name' => 'SPP & Pembayaran', 'route' => 'journals.index', 'category_id' => '6', 'icon' => 'fas fa-wallet']);
         Menu::create(['parent_id' => $spp->id, 'name' => 'Data Pembayaran SPP', 'route' => 'journals.index', 'category_id' => '6', 'icon' => 'fas fa-file-invoice-dollar']);

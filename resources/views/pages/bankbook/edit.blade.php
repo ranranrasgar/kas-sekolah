@@ -4,19 +4,26 @@
         <div class="col-md-12">
             <div class="card">
                 <div class="card-header">
-                    <h4 class="fw-bold mb-3">Tambah Jurnal</h4>
+                    <h4 class="fw-bold mb-3">Edit Jurnal - {{ optional($journal->journalCategory->coa)->name }}</h4>
                 </div>
                 <div class="card-body">
-
                     <x-validations-errors />
+                    {{-- @if (session('error'))
+                        <div class="alert alert-danger">{{ session('error') }}</div>
+                    @endif
+                    @if (session('success'))
+                        <div class="alert alert-success">{{ session('success') }}</div>
+                    @endif --}}
 
-                    <form action="{{ route('journals.store') }}" method="POST">
+                    <form action="{{ route('bankbook.update', $journal->id) }}" method="POST"
+                        onsubmit="removeCurrencyFormatBeforeSubmit() ">
                         @csrf
+                        @method('PUT')
                         <div class="row mb-3">
                             <div class="col-md-4">
                                 <label class="form-label">Tanggal</label>
                                 <input type="date" name="date" class="form-control"
-                                    value="{{ old('date', today()->format('Y-m-d')) }}" required>
+                                    value="{{ old('date', $journal->date) }}" required>
                             </div>
 
                             <div class="col-md-4">
@@ -24,43 +31,39 @@
                                 <select name="category_id" class="form-select" required>
                                     <option value="">Pilih Kategori</option>
                                     @foreach ($categories as $category)
-                                        <option value="{{ $category->id }}"
-                                            {{ old('category_id', request('category_id', optional($category)->id)) == $category->id ? 'selected' : '' }}>
-                                            {{ $category->name }}
+                                        <option value="{{ old('category_id', $category->id) }}"
+                                            {{ $category->id == $journal->category_id ? 'selected' : '' }}>
+                                            {{ $category->name }} - ({{ $category->coa->code }} :
+                                            {{ $category->coa->name }})
                                         </option>
                                     @endforeach
                                 </select>
-
                             </div>
                             <div class="col-md-4">
-                                <label class="form-label">No Referensi</label>
+                                <label class="form-label">Referensi</label>
                                 <input type="text" name="reference" class="form-control"
-                                    value="{{ old('reference', $referenceNo) }}" readonly required>
+                                    value="{{ old('reference', $journal->reference) }}" placeholder="Masukkan Referensi">
                             </div>
-
                         </div>
                         <div class="row mb-3">
                             <div class="col-md-4">
                                 <label class="form-label">Deskripsi</label>
                                 <input type="text" name="description" class="form-control"
-                                    value="{{ old('description') }}" placeholder="Deskripsi Jurnal">
+                                    value="{{ old('description', $journal->description) }}" placeholder="Deskripsi Jurnal">
                             </div>
-
                             <div class="col-md-4">
                                 <label class="form-label">Mata Uang</label>
                                 <select name="currency_id" class="form-select" required>
                                     <option value="">Pilih Mata Uang</option>
                                     @foreach ($currencies as $currency)
-                                        <option value="{{ $currency->id }}"
-                                            {{ old('currency_id', request('currency_id', 1)) == $currency->id ? 'selected' : '' }}>
+                                        <option value="{{ old('currency_id', $currency->id) }}"
+                                            {{ $currency->id == $journal->currency_id ? 'selected' : '' }}>
                                             {{ $currency->code }} - {{ $currency->name }}
                                         </option>
                                     @endforeach
                                 </select>
                             </div>
-
                         </div>
-
                         <h5 class="mt-4">Detail Jurnal</h5>
                         <table class="table table-bordered" id="journal-entries">
                             <thead>
@@ -72,66 +75,39 @@
                                 </tr>
                             </thead>
                             <tbody>
-                                @php
-                                    $oldEntries = old('journal_entries', []);
-                                @endphp
-
-                                @if (count($oldEntries) > 0)
-                                    @foreach ($oldEntries as $index => $entry)
-                                        <tr>
-                                            <td>
-                                                <select name="journal_entries[{{ $index }}][coa_id]"
-                                                    class="form-select">
-                                                    <option value="">Pilih Akun COA</option>
-                                                    @foreach ($coas as $coa)
-                                                        <option value="{{ $coa->id }}"
-                                                            {{ $coa->id == old('journal_entries.' . $index . '.coa_id') ? 'selected' : '' }}>
-                                                            {{-- {{ $coa->code }} - {{ $coa->name }} --}}
-                                                            {{ $coa->name }} - {{ $coa->code }}
-                                                        </option>
-                                                    @endforeach
-                                                </select>
-                                            </td>
-                                            <td>
-                                                <input type="text" name="journal_entries[{{ $index }}][debit]"
-                                                    class="form-control text-end currency-input"
-                                                    value="{{ old('journal_entries.' . $index . '.debit', '0') }}">
-                                            </td>
-                                            <td>
-                                                <input type="text" name="journal_entries[{{ $index }}][credit]"
-                                                    class="form-control text-end currency-input"
-                                                    value="{{ old('journal_entries.' . $index . '.credit', '0') }}">
-                                            </td>
-                                            <td>
-                                                <button type="button"
-                                                    class="btn btn-danger btn-sm remove-row">Hapus</button>
-                                            </td>
-                                        </tr>
-                                    @endforeach
-                                @else
+                                @foreach ($journal->journalEntries as $index => $entry)
                                     <tr>
                                         <td>
-                                            <select name="journal_entries[0][coa_id]" class="form-select">
+                                            <select name="journal_entries[{{ $index }}][coa_id]"
+                                                class="form-select">
                                                 <option value="">Pilih Akun COA</option>
-                                                @foreach ($coas as $coa)
-                                                    <option value="{{ $coa->id }}">{{ $coa->name }} -
-                                                        {{ $coa->code }}</option>
+                                                @foreach ($coas ?? [] as $coa)
+                                                    <option value="{{ $coa->id }}"
+                                                        {{ old('journal_entries.' . $index . '.coa_id', $entry->coa_id) == $coa->id ? 'selected' : '' }}>
+                                                        {{ $coa->code }} - {{ $coa->name }}
+                                                    </option>
                                                 @endforeach
                                             </select>
+
                                         </td>
                                         <td>
-                                            <input type="text" name="journal_entries[0][debit]"
-                                                class="form-control text-end currency-input" value="0">
+                                            <input type="text" name="journal_entries[{{ $index }}][debit]"
+                                                class="form-control text-end currency-input"
+                                                value="{{ old('journal_entries.' . $index . '.debit', number_format($entry->debit, 0, ',', '.')) }}">
+
                                         </td>
                                         <td>
-                                            <input type="text" name="journal_entries[0][credit]"
-                                                class="form-control text-end currency-input" value="0">
+                                            <input type="text" name="journal_entries[{{ $index }}][credit]"
+                                                class="form-control text-end currency-input"
+                                                value="{{ old('journal_entries.' . $index . '.credit', number_format($entry->credit, 0, ',', '.')) }}">
                                         </td>
+
+
                                         <td>
                                             <button type="button" class="btn btn-danger btn-sm remove-row">Hapus</button>
                                         </td>
                                     </tr>
-                                @endif
+                                @endforeach
                             </tbody>
                             <tfoot>
                                 <tr>
@@ -273,7 +249,7 @@
                             <select name="journal_entries[${rowCount}][coa_id]" class="form-select">
                                 <option value="">Pilih Akun COA</option>
                                 @foreach ($coas ?? [] as $coa)
-                                    <option value="{{ $coa->id }}">{{ $coa->name }} - {{ $coa->code }}</option>
+                                    <option value="{{ $coa->id }}">{{ $coa->code }} - {{ $coa->name }}</option>
                                 @endforeach
                             </select>
                         </td>

@@ -16,10 +16,12 @@ class Student extends Model
     {
         return $this->belongsTo(Major::class, 'major_id');
     }
+
     public function class()
     {
         return $this->belongsTo(Classe::class, 'class_id');
     }
+
     public function agama()
     {
         return $this->belongsTo(Agama::class, 'agama_id');

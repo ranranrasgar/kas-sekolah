@@ -59,29 +59,30 @@
 
                         <div class="row mb-3">
                             <div class="col-md-4">
-                                <label for="major_id" class="form-label">Jurusan</label>
-                                <select name="major_id" class="form-select">
-                                    <option value="">Pilih Jurusan</option>
-                                    @foreach ($majors as $major)
-                                        <option value="{{ $major->id }}"
-                                            {{ old('major_id') == $major->id ? 'selected' : '' }}>
-                                            {{ $major->name }}
-                                        </option>
-                                    @endforeach
-                                </select>
-                            </div>
-                            <div class="col-md-4">
                                 <label for="class_id" class="form-label">Kelas</label>
                                 <select name="class_id" class="form-select">
                                     <option value="">Pilih Kelas</option>
                                     @foreach ($classes as $class)
                                         <option value="{{ $class->id }}"
                                             {{ old('class_id') == $class->id ? 'selected' : '' }}>
-                                            {{ $class->name }}
+                                            {{ $class->class_name }}
                                         </option>
                                     @endforeach
                                 </select>
                             </div>
+                            <div class="col-md-4">
+                                <label for="major_id" class="form-label">Jurusan</label>
+                                <select name="major_id" class="form-select">
+                                    <option value="">Pilih Jurusan</option>
+                                    @foreach ($majors as $major)
+                                        <option value="{{ $major->id }}"
+                                            {{ old('major_id') == $major->id ? 'selected' : '' }}>
+                                            {{ $major->major_name }}
+                                        </option>
+                                    @endforeach
+                                </select>
+                            </div>
+
                             <div class="col-md-4">
                                 <label for="agama_id" class="form-label">Agama</label>
                                 <select name="agama_id" class="form-select">
