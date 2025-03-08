@@ -4,16 +4,17 @@
         <div class="col-md-12">
             <div class="card">
                 <div class="card-header">
-                    <h4 class="fw-bold mb-3">Edit Jurnal - {{ optional($journal->journalCategory->coa)->name }}</h4>
+                    <h4 class="fw-bold mb-3">Edit - {{ optional($journal->journalCategory->coa)->name }}</h4>
                 </div>
                 <div class="card-body">
                     <x-validations-errors />
                     {{-- @if (session('error'))
-                        <div class="alert alert-danger">{{ session('error') }}</div>
-                    @endif
-                    @if (session('success'))
-                        <div class="alert alert-success">{{ session('success') }}</div>
-                    @endif --}}
+                        <div class="alert alert-danger">{{ session('error') }}
+            </div>
+            @endif
+            @if (session('success'))
+            <div class="alert alert-success">{{ session('success') }}</div>
+            @endif --}}
 
                     <form action="{{ route('bankbook.update', $journal->id) }}" method="POST"
                         onsubmit="removeCurrencyFormatBeforeSubmit() ">
@@ -64,18 +65,19 @@
                                 </select>
                             </div>
                         </div>
-                        <h5 class="mt-4">Detail Jurnal</h5>
+                        <h5 class="mt-4">Rincian Pencatatan Dana</h5>
                         <table class="table table-bordered" id="journal-entries">
                             <thead>
                                 <tr>
-                                    <th>Akun COA</th>
-                                    <th>Debit</th>
-                                    <th>Kredit</th>
+                                    <th>Jenis Kas</th>
+                                    <th>Pemasukan</th>
+                                    <th>Pengeluaran</th>
                                     <th>Aksi</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                @foreach ($journal->journalEntries as $index => $entry)
+                                {{-- @foreach ($journal->journalEntries as $index => $entry) --}}
+                                @foreach ($journal->journalEntries->where('coa_id', '!=', $journal->journalCategory->coa_id) as $index => $entry)
                                     <tr>
                                         <td>
                                             <select name="journal_entries[{{ $index }}][coa_id]"
@@ -90,18 +92,18 @@
                                             </select>
 
                                         </td>
+
+                                        <td>
+                                            <input type="text" name="journal_entries[{{ $index }}][credit]"
+                                                class="form-control text-end currency-input"
+                                                value="{{ old('journal_entries.' . $index . '.credit', number_format($entry->credit, 0, ',', '.')) }}">
+                                        </td>
                                         <td>
                                             <input type="text" name="journal_entries[{{ $index }}][debit]"
                                                 class="form-control text-end currency-input"
                                                 value="{{ old('journal_entries.' . $index . '.debit', number_format($entry->debit, 0, ',', '.')) }}">
 
                                         </td>
-                                        <td>
-                                            <input type="text" name="journal_entries[{{ $index }}][credit]"
-                                                class="form-control text-end currency-input"
-                                                value="{{ old('journal_entries.' . $index . '.credit', number_format($entry->credit, 0, ',', '.')) }}">
-                                        </td>
-
 
                                         <td>
                                             <button type="button" class="btn btn-danger btn-sm remove-row">Hapus</button>
@@ -112,8 +114,9 @@
                             <tfoot>
                                 <tr>
                                     <th>Total</th>
-                                    <th class="text-end" id="total-debit">0</th>
                                     <th class="text-end" id="total-credit">0</th>
+                                    <th class="text-end" id="total-debit">0</th>
+
                                     <th></th>
                                 </tr>
                             </tfoot>
@@ -253,11 +256,12 @@
                                 @endforeach
                             </select>
                         </td>
-                        <td>
-                            <input type="text" name="journal_entries[${rowCount}][debit]" class="form-control text-end currency-input" value="0">
-                        </td>
+
                         <td>
                             <input type="text" name="journal_entries[${rowCount}][credit]" class="form-control text-end currency-input" value="0">
+                        </td>
+                        <td>
+                            <input type="text" name="journal_entries[${rowCount}][debit]" class="form-control text-end currency-input" value="0">
                         </td>
                         <td>
                             <button type="button" class="btn btn-danger btn-sm remove-row">Hapus</button>
