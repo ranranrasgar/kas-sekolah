@@ -76,8 +76,8 @@
                                     <th>Tanggal</th>
                                     <th>No.Reff</th>
                                     <th>Keterangan</th>
-                                    <th>Debit (Rp)</th>
-                                    <th>Kredit (Rp)</th>
+                                    <th>Pemasukan (Rp)</th>
+                                    <th>Pengeluaran (Rp)</th>
                                     <th>Saldo (Rp)</th>
                                     <th style="width: 10%">Action</th>
                                 </tr>

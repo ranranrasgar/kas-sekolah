@@ -223,27 +223,6 @@ class BankbookController extends Controller
      */
     public function update(Request $request, string $id)
     {
-        // Bersihkan nilai debit dan kredit
-        $cleanedEntries = collect($request->input('journal_entries', []))->map(function ($entry) {
-            $entry['debit'] = str_replace('.', '', $entry['debit'] ?? '0');
-            $entry['credit'] = str_replace('.', '', $entry['credit'] ?? '0');
-            return $entry;
-        })->toArray();
-
-        $request->merge(['journal_entries' => $cleanedEntries]);
-
-        // Validasi input
-        $validated = $request->validate([
-            'date' => 'required|date',
-            'description' => 'required|string|max:255',
-            'category_id' => 'required|exists:journal_categories,id',
-            'currency_id' => 'required|exists:currencies,id',
-            'journal_entries' => 'required|array|min:1', // Minimal harus ada 1 entri (karena lawannya akan dibuat otomatis)
-            'journal_entries.*.coa_id' => 'required|exists:coas,id',
-            'journal_entries.*.debit' => 'nullable|numeric|min:0',
-            'journal_entries.*.credit' => 'nullable|numeric|min:0',
-        ]);
-
         // Cari jurnal berdasarkan ID
         $journal = Journal::findOrFail($id);
 
@@ -255,29 +234,63 @@ class BankbookController extends Controller
                 ->withInput();
         }
 
+        // Hapus entri yang menggunakan coa_id dari kategori sebelumnya
+        JournalEntry::where('journal_id', $journal->id)
+            ->where('coa_id', $categoryCoa->id)
+            ->delete();
+
+        // Bersihkan nilai debit dan kredit
+        $cleanedEntries = collect($request->input('journal_entries', []))
+            ->filter(fn($entry) => $entry['coa_id'] != $categoryCoa->id) // Abaikan yang sama dengan category_coa
+            ->map(function ($entry) {
+                $entry['debit'] = (int) str_replace('.', '', $entry['debit'] ?? '0');
+                $entry['credit'] = (int) str_replace('.', '', $entry['credit'] ?? '0');
+                return $entry;
+            })->values()->toArray(); // Reset index agar tetap berurutan
+
+        // Pastikan semua input hanya di satu sisi (hanya debit atau hanya credit)
+        $hasDebit = collect($cleanedEntries)->contains(fn($entry) => $entry['debit'] > 0);
+        $hasCredit = collect($cleanedEntries)->contains(fn($entry) => $entry['credit'] > 0);
+
+
+        if ($hasDebit && $hasCredit) {
+            return redirect()->back()
+                ->withErrors(['error' => 'Semua entri harus hanya Debit atau hanya Kredit, tidak boleh keduanya dalam satu transaksi.'])
+                ->withInput();
+        }
+
+        // Masukkan data yang telah dibersihkan kembali ke request
+        $request->merge(['journal_entries' => $cleanedEntries]);
+
+        // Validasi input
+        $validated = $request->validate([
+            'date' => 'required|date',
+            'description' => 'required|string|max:255',
+            'category_id' => 'required|exists:journal_categories,id',
+            'currency_id' => 'required|exists:currencies,id',
+            'journal_entries' => 'required|array|min:1',
+            'journal_entries.*.coa_id' => 'required|exists:coas,id',
+            'journal_entries.*.debit' => 'nullable|numeric|min:0',
+            'journal_entries.*.credit' => 'nullable|numeric|min:0',
+        ]);
+
         // Hitung total debit dan kredit dari input user
         $totalDebit = collect($cleanedEntries)->sum('debit');
         $totalCredit = collect($cleanedEntries)->sum('credit');
 
-        // Jika jumlah debit dan kredit tidak sama, buat lawan entri untuk kategori COA
-        if ($totalDebit != $totalCredit) {
-            $difference = abs($totalDebit - $totalCredit);
-
-            if ($totalDebit > $totalCredit) {
-                // Tambahkan entri kredit untuk kategori COA
-                $cleanedEntries[] = [
-                    'coa_id' => $categoryCoa->id,
-                    'debit' => 0,
-                    'credit' => $difference,
-                ];
-            } else {
-                // Tambahkan entri debit untuk kategori COA
-                $cleanedEntries[] = [
-                    'coa_id' => $categoryCoa->id,
-                    'debit' => $difference,
-                    'credit' => 0,
-                ];
-            }
+        // Tambahkan entri lawan dengan coa_id kategori
+        if ($totalDebit > $totalCredit) {
+            $cleanedEntries[] = [
+                'coa_id' => $categoryCoa->id,
+                'debit' => 0,
+                'credit' => $totalDebit
+            ];
+        } elseif ($totalCredit > $totalDebit) {
+            $cleanedEntries[] = [
+                'coa_id' => $categoryCoa->id,
+                'debit' => $totalCredit,
+                'credit' => 0
+            ];
         }
 
         // Simpan perubahan jurnal
@@ -288,17 +301,24 @@ class BankbookController extends Controller
 
         // Update atau buat journal_entries
         foreach ($cleanedEntries as $entry) {
-            if (!empty($entry['coa_id'])) {
-                $newEntryIds[] = $entry['coa_id'];
-                JournalEntry::updateOrCreate(
-                    ['journal_id' => $journal->id, 'coa_id' => $entry['coa_id']],
-                    ['debit' => $entry['debit'], 'credit' => $entry['credit']]
-                );
-            }
+            $journalEntry = JournalEntry::updateOrCreate(
+                [
+                    'journal_id' => $journal->id,
+                    'coa_id' => $entry['coa_id']
+                ],
+                [
+                    'debit' => $entry['debit'],
+                    'credit' => $entry['credit']
+                ]
+            );
+
+            $newEntryIds[] = $journalEntry->coa_id;
         }
 
         // Hapus entri lama yang tidak ada dalam input terbaru
-        JournalEntry::where('journal_id', $journal->id)->whereNotIn('coa_id', $newEntryIds)->delete();
+        JournalEntry::where('journal_id', $journal->id)
+            ->whereNotIn('coa_id', $newEntryIds)
+            ->delete();
 
         return redirect()->route('bankbook.index', [
             'category_id' => $request->input('category_id'),
@@ -306,6 +326,93 @@ class BankbookController extends Controller
             'end_date' => $request->input('end_date'),
         ])->with('success', 'Jurnal berhasil diperbarui.');
     }
+
+
+
+    // public function update(Request $request, string $id)
+    // {
+    //     // Bersihkan nilai debit dan kredit
+    //     $cleanedEntries = collect($request->input('journal_entries', []))->map(function ($entry) {
+    //         $entry['debit'] = str_replace('.', '', $entry['debit'] ?? '0');
+    //         $entry['credit'] = str_replace('.', '', $entry['credit'] ?? '0');
+    //         return $entry;
+    //     })->toArray();
+
+    //     $request->merge(['journal_entries' => $cleanedEntries]);
+    //     // dd($request);
+
+    //     // Validasi input
+    //     $validated = $request->validate([
+    //         'date' => 'required|date',
+    //         'description' => 'required|string|max:255',
+    //         'category_id' => 'required|exists:journal_categories,id',
+    //         'currency_id' => 'required|exists:currencies,id',
+    //         'journal_entries' => 'required|array|min:1', // Minimal harus ada 1 entri (karena lawannya akan dibuat otomatis)
+    //         'journal_entries.*.coa_id' => 'required|exists:coas,id',
+    //         'journal_entries.*.debit' => 'nullable|numeric|min:0',
+    //         'journal_entries.*.credit' => 'nullable|numeric|min:0',
+    //     ]);
+
+    //     // Cari jurnal berdasarkan ID
+    //     $journal = Journal::findOrFail($id);
+
+    //     // Ambil COA dari kategori jurnal
+    //     $categoryCoa = $journal->journalCategory->coa ?? null;
+    //     if (!$categoryCoa) {
+    //         return redirect()->back()
+    //             ->withErrors(['error' => 'Kategori jurnal tidak memiliki akun COA.'])
+    //             ->withInput();
+    //     }
+
+    //     // Hitung total debit dan kredit dari input user
+    //     $totalDebit = collect($cleanedEntries)->sum('debit');
+    //     $totalCredit = collect($cleanedEntries)->sum('credit');
+
+
+    //     // Jika jumlah debit dan kredit tidak sama, buat lawan entri untuk kategori COA
+    //     if ($totalDebit != $totalCredit) {
+    //         $difference = abs($totalDebit - $totalCredit);
+
+    //         // Pastikan tidak ada duplikasi akun COA kategori
+    //         $existingCoaIds = collect($cleanedEntries)->pluck('coa_id')->toArray();
+
+    //         if (!in_array($categoryCoa->id, $existingCoaIds)) {
+    //             if ($totalDebit > $totalCredit) {
+    //                 $cleanedEntries[] = ['coa_id' => $categoryCoa->id, 'debit' => 0, 'credit' => $difference];
+    //             } else {
+    //                 $cleanedEntries[] = ['coa_id' => $categoryCoa->id, 'debit' => $difference, 'credit' => 0];
+    //             }
+    //         }
+    //     }
+
+    //     // Simpan perubahan jurnal
+    //     $journal->update(Arr::except($validated, ['journal_entries']));
+
+    //     // Simpan ID coa_id yang baru untuk perbandingan
+    //     $newEntryIds = [];
+
+    //     // Update atau buat journal_entries
+    //     foreach ($cleanedEntries as $entry) {
+    //         $journalEntry = JournalEntry::firstOrNew([
+    //             'journal_id' => $journal->id,
+    //             'coa_id' => $entry['coa_id']
+    //         ]);
+    //         $journalEntry->debit = $entry['debit'];
+    //         $journalEntry->credit = $entry['credit'];
+    //         $journalEntry->save();
+
+    //         $newEntryIds[] = $journalEntry->coa_id;
+    //     }
+
+    //     // Hapus entri lama yang tidak ada dalam input terbaru
+    //     JournalEntry::where('journal_id', $journal->id)->whereNotIn('coa_id', $newEntryIds)->delete();
+
+    //     return redirect()->route('bankbook.index', [
+    //         'category_id' => $request->input('category_id'),
+    //         'start_date' => $request->input('start_date'),
+    //         'end_date' => $request->input('end_date'),
+    //     ])->with('success', 'Jurnal berhasil diperbarui.');
+    // }
 
     // public function update(Request $request, string $id)
     // {

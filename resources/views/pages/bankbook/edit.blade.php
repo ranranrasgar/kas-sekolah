@@ -69,16 +69,25 @@
                         <table class="table table-bordered" id="journal-entries">
                             <thead>
                                 <tr>
-                                    <th>Jenis Kas</th>
+                                    <th>Jenis Pemasukan atau Pengeluaran</th>
                                     <th>Pemasukan</th>
                                     <th>Pengeluaran</th>
                                     <th>Aksi</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                {{-- @foreach ($journal->journalEntries as $index => $entry) --}}
-                                @foreach ($journal->journalEntries->where('coa_id', '!=', $journal->journalCategory->coa_id) as $index => $entry)
+                                @foreach ($journal->journalEntries as $index => $entry)
+                                    {{-- @foreach ($journal->journalEntries->where('coa_id', '!=', $journal->journalCategory->coa_id) as $index => $entry) --}}
                                     <tr>
+                                        @if ($entry->coa_id == $journal->journalCategory->coa_id)
+                                            <input type="hidden" name="journal_entries[{{ $index }}][coa_id]"
+                                                value="{{ $entry->coa_id }}">
+                                            <input type="hidden" name="journal_entries[{{ $index }}][credit]"
+                                                value="{{ $entry->credit }}">
+                                            <input type="hidden" name="journal_entries[{{ $index }}][debit]"
+                                                value="{{ $entry->debit }}">
+                                            @continue
+                                        @endif
                                         <td>
                                             <select name="journal_entries[{{ $index }}][coa_id]"
                                                 class="form-select">
@@ -90,7 +99,6 @@
                                                     </option>
                                                 @endforeach
                                             </select>
-
                                         </td>
 
                                         <td>
@@ -113,9 +121,10 @@
                             </tbody>
                             <tfoot>
                                 <tr>
-                                    <th>Total</th>
-                                    <th class="text-end" id="total-credit">0</th>
-                                    <th class="text-end" id="total-debit">0</th>
+                                    {{-- <th>Total</th> --}}
+                                    <th class="text-end" id="total-grand">0</th>
+                                    {{-- <th class="text-end" id="total-credit">0</th>
+                                    <th class="text-end" id="total-debit">0</th> --}}
 
                                     <th></th>
                                 </tr>
@@ -165,11 +174,6 @@
             // Format currency saat halaman pertama kali dimuat
             formatCurrencyOnLoad();
 
-            // Mengirimkan form dan mengonversi input
-            // document.querySelector('form').addEventListener('submit', function(event) {
-            //     removeCurrencyFormatBeforeSubmit(); // Menghapus format mata uang sebelum submit
-            // });
-
             // Fungsi untuk menghitung total debit dan kredit
             function calculateTotals() {
                 let totalDebit = 0;
@@ -188,14 +192,24 @@
                 // Menampilkan total debit dan kredit
                 let totalDebitElem = document.getElementById('total-debit');
                 let totalCreditElem = document.getElementById('total-credit');
+                let totalGrandElem = document.getElementById('total-grand');
 
-                totalDebitElem.textContent = formatCurrency(totalDebit);
-                totalCreditElem.textContent = formatCurrency(totalCredit);
+                if (totalDebitElem !== 0 && totalDebitElem !== "") {
+                    totalGrandElem.textContent = formatCurrency(totalDebit);
+                } else if (totalCreditElem !== "" && totalCreditElem !== 0) {
+                    totalGrandElem.textContent = formatCurrency(totalCredit);
+                } else {
+                    totalGrandElem.textContent = formatCurrency(0);
+                }
+
+                // totalDebitElem.textContent = formatCurrency(totalDebit);
+                // totalCreditElem.textContent = formatCurrency(totalCredit);
 
                 // Menentukan warna jika total debit dan kredit tidak sama
                 let color = (totalDebit !== totalCredit) ? 'red' : 'black';
                 totalDebitElem.style.color = color;
                 totalCreditElem.style.color = color;
+                totalGrandElem.style.color = color;
             }
 
             // Fungsi untuk menambahkan event listeners ke elemen
